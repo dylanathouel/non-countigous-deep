@@ -96,6 +96,8 @@ def gwo_deep(
     
     # Initialize wolves
     wolves = np.random.uniform(bounds[0], bounds[1], (num_agents, dim))
+    # CRITICAL FIX: Inject current best solution
+    wolves[0] = nn.get_weights_as_vector()
     alpha = beta = delta = None
     alpha_score = beta_score = delta_score = float("inf")
     history = []

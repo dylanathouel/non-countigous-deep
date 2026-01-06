@@ -22,8 +22,8 @@ HIDDEN_SIZES = [12, 8, 4]
 BACKPROP_EPOCHS = 500000     # Sufficient to show stagnation
 GWO_ITERATIONS = 2000      # Increased to handle larger network
 RAY_ITERATIONS = 2000
-HYBRID_RAY = 500
-HYBRID_GWO = 3000
+HYBRID_RAY = 2000
+HYBRID_GWO = 2000
 
 # Dataset
 N_SAMPLES = 1500
@@ -191,6 +191,8 @@ def train_gwo(nn, X, y, iterations=1000, n_agents=30, bounds=(-2, 2)):
     
     # Initialize wolves
     wolves = np.random.uniform(bounds[0], bounds[1], (n_agents, dim))
+    # CRITICAL FIX: Inject current best solution to prevent MSE spike
+    wolves[0] = nn.get_params()
     
     # Evaluate initial population
     scores = []
