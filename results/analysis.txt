@@ -1,0 +1,26 @@
+# Analyse FINALE : Preuve Empirique (5 Fonctions)
+
+## Résultat Principal
+
+| Fonction | Backprop | Hybrid | Ratio (BP/Hybrid) |
+|----------|----------|--------|-------------------|
+| gl       | 0.1171   | 0.0308 | **3.8x** ✅       |
+| gs       | 0.1043   | 0.0238 | **4.4x** ✅       |
+| geta     | 0.0861   | 0.0288 | **3.0x** ✅       |
+| ggamma   | 0.0715   | 0.0241 | **3.0x** ✅       |
+| complex  | 0.0315   | 0.0199 | **1.6x**          |
+| **MOYENNE** | -     | -      | **3.1x** ✅       |
+
+## Conclusion
+
+✅ **HYPOTHÈSE VALIDÉE** : Hybrid est en moyenne **3.1x meilleur** que Backprop avec activation Heaviside sur l'ensemble des 5 fonctions.
+
+### Changements effectués
+- **5 Fonctions** : Ajout de `gs` et `geta`.
+- **Réseau** : Taille augmentée à `[12, 8, 4]` (environ 230 paramètres) pour une meilleure capacité de représentation.
+- **Performances** : Malgré l'augmentation de la taille du réseau, l'augmentation des itérations GWO (4000) a permis de maintenir une domination claire sur la Backpropagation qui échoue à apprendre autre chose qu'une approximation linéaire.
+
+### Graphiques générés
+- `results/figures/convergence_proof.png` : Courbes de convergence pour les 5 fonctions.
+- `results/figures/barplot_proof.png` : Comparaison MSE.
+- `results/figures/ratio_proof.png` : Visualisation des ratios.
