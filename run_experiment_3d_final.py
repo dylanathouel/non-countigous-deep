@@ -20,7 +20,7 @@ SEED = 42
 np.random.seed(SEED)
 
 HIDDEN_SIZES = [16, 12, 8]
-BACKPROP_EPOCHS = 100000
+BACKPROP_EPOCHS = 25000
 TIME_LIMIT = 60 # Seconds per algorithm
 
 N_SAMPLES = 2000
