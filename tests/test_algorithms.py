@@ -73,27 +73,27 @@ def test_ray_shooting_history_monotone():
     print("PASS: test_ray_shooting_history_monotone")
 
 
-def test_ray_shooting_multi_direction_beats_single():
-    """Best-of-K=5 doit battre K=1 EN MOYENNE sur plusieurs seeds (10D)."""
+def test_ray_shooting_steps20_beats_steps50():
+    """steps_per_ray=20 doit battre steps_per_ray=50 EN MOYENNE (10D, multi-seeds)."""
     from core.algorithms import train_ray_shooting
     X_tr, y_tr, _, _ = _make_problem(dim=10, n=500)
     seeds = [0, 1, 2, 7, 13]
-    f_k1s, f_k5s = [], []
+    f_50s, f_20s = [], []
     for s in seeds:
-        nn1 = HeavisideNetwork(10, [16, 12, 8], 1, seed=42)
-        nn5 = HeavisideNetwork(10, [16, 12, 8], 1, seed=42)
-        f1, _ = train_ray_shooting(nn1, X_tr, y_tr, eval_budget=3000,
-                                    k_directions=1, steps_per_ray=20, seed=s)
-        f5, _ = train_ray_shooting(nn5, X_tr, y_tr, eval_budget=3000,
-                                    k_directions=5, steps_per_ray=20, seed=s)
-        f_k1s.append(f1); f_k5s.append(f5)
-    mean_k1 = sum(f_k1s) / len(f_k1s)
-    mean_k5 = sum(f_k5s) / len(f_k5s)
-    assert mean_k5 < mean_k1, (
-        f"k=5 moyenne ({mean_k5:.5f}) doit battre k=1 moyenne ({mean_k1:.5f}) "
+        nn50 = HeavisideNetwork(10, [16, 12, 8], 1, seed=42)
+        nn20 = HeavisideNetwork(10, [16, 12, 8], 1, seed=42)
+        f50, _ = train_ray_shooting(nn50, X_tr, y_tr, eval_budget=3000,
+                                     steps_per_ray=50, seed=s)
+        f20, _ = train_ray_shooting(nn20, X_tr, y_tr, eval_budget=3000,
+                                     steps_per_ray=20, seed=s)
+        f_50s.append(f50); f_20s.append(f20)
+    mean_50 = sum(f_50s) / len(f_50s)
+    mean_20 = sum(f_20s) / len(f_20s)
+    assert mean_20 < mean_50, (
+        f"steps=20 ({mean_20:.5f}) doit battre steps=50 ({mean_50:.5f}) "
         f"sur {len(seeds)} seeds")
-    print(f"PASS: test_ray_shooting_multi_direction_beats_single "
-          f"(mean k1={mean_k1:.5f}, mean k5={mean_k5:.5f}, {len(seeds)} seeds)")
+    print(f"PASS: test_ray_shooting_steps20_beats_steps50 "
+          f"(mean s50={mean_50:.5f}, mean s20={mean_20:.5f}, {len(seeds)} seeds)")
 
 
 # ============================================================================
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     test_backprop_hidden_layers_frozen()
     test_ray_shooting_decreases_mse()
     test_ray_shooting_history_monotone()
-    test_ray_shooting_multi_direction_beats_single()
+    test_ray_shooting_steps20_beats_steps50()
     test_gwo_decreases_mse()
     test_gwo_seeds_current_position()
     test_hybrid_seeded_runs()
