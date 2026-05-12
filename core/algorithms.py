@@ -56,11 +56,18 @@ def train_backprop(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
 # ============================================================================
 
 def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
-                       eval_budget: int = 25000, steps_per_ray: int = 50,
+                       eval_budget: int = 25000, steps_per_ray: int = 20,
+                       k_directions: int = 5,
                        bounds: Tuple[float, float] = (-2.0, 2.0), seed: int = None
                        ) -> Tuple[float, List[float]]:
-    """Tire des rayons depuis la meilleure position courante vers des cibles
-    aléatoires uniformes dans bounds^dim."""
+    """Ray Shooting "best-of-K directions".
+
+    À chaque round, essaie k_directions rayons (cibles uniformes dans bounds).
+    Pour chaque rayon, parcourt steps_per_ray points sans break.
+    Garde le meilleur point trouvé sur l'ensemble du round et met à jour best.
+
+    k_directions=1 + steps_per_ray=50 reproduit (presque) l'ancien comportement
+    (sans le break interne)."""
     rng = np.random.RandomState(seed)
     dim = nn.num_params()
 
@@ -69,21 +76,30 @@ def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
     history: List[float] = [best_score]
 
     while len(history) < eval_budget:
-        target = rng.uniform(bounds[0], bounds[1], dim)
-        direction = target - best_vec
+        round_best_vec = None
+        round_best_score = float('inf')
 
-        for step in range(steps_per_ray):
+        for _ in range(k_directions):
             if len(history) >= eval_budget:
                 break
-            t = step / max(1, steps_per_ray - 1)
-            candidate = np.clip(best_vec + t * direction, bounds[0], bounds[1])
-            nn.set_params(candidate)
-            score = _mse(y, nn.forward(X))
-            history.append(min(score, best_score))
-            if score < best_score:
-                best_vec = candidate.copy()
-                best_score = score
-                break
+            target = rng.uniform(bounds[0], bounds[1], dim)
+            direction = target - best_vec
+
+            for step in range(steps_per_ray):
+                if len(history) >= eval_budget:
+                    break
+                t = step / max(1, steps_per_ray - 1)
+                candidate = np.clip(best_vec + t * direction, bounds[0], bounds[1])
+                nn.set_params(candidate)
+                score = _mse(y, nn.forward(X))
+                if score < round_best_score:
+                    round_best_vec = candidate.copy()
+                    round_best_score = score
+                history.append(min(best_score, round_best_score))
+
+        if round_best_score < best_score:
+            best_vec = round_best_vec
+            best_score = round_best_score
 
     nn.set_params(best_vec)
     history = history[:eval_budget]
