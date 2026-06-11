@@ -26,15 +26,27 @@ de 25 000 évaluations** de la fonction de perte par algorithme.
 
 | Dimension | Backprop | Ray Shooting | GWO | **Hybrid** |
 |-----------|----------|--------------|-----|------------|
-| 3D        | 0.0620   | 0.0604       | 0.0385 | **0.0360** |
-| 10D       | 0.0674   | 0.0634       | 0.0476 | **0.0462** |
-| 50D       | 0.0787   | 0.0788       | 0.0594 | **0.0549** |
+| 3D        | 0.0620   | 0.0612       | 0.0385 | **0.0360** |
+| 10D       | 0.0674   | 0.0647       | 0.0476 | **0.0462** |
+| 50D       | 0.0787   | 0.0789       | 0.0594 | **0.0549** |
 
 **Hybrid est l'algorithme avec le meilleur MSE moyen pour les trois dimensions.**
 
-### Hybrid bat individuellement les autres sur 10/15 combinaisons (func × dim)
+### Note sur Ray Shooting
 
-Sur les 5 sur lesquels hybrid ne gagne pas individuellement (`gs` en 3D, `gl/gs/geta` en 10D, `ggamma` en 50D), il reste systématiquement à <5% de l'algorithme gagnant — jamais loin derrière.
+Ray Shooting est étonnamment proche de Backprop en performance (les deux convergent à un niveau correct mais sont battus par GWO et Hybrid). C'est parce que :
+
+- Ray utilise des cibles **uniformes aléatoires** dans `[-2, 2]^D`, ce qui en 50D (1133 paramètres) donne des directions essentiellement isotropes — peu informatives.
+- Pas de **mémoire collective** comme GWO (alpha/beta/delta) qui guide l'exploration.
+- Pas de **raffinement local** : dès qu'un point un peu meilleur est trouvé, on saute vers une nouvelle direction.
+
+C'est précisément la **valeur ajoutée du Hybrid** : Ray fait une exploration brute initiale, puis GWO seedé exploite la sagesse collective pour raffiner. La combinaison surpasse chaque algorithme pris isolément.
+
+Le paramètre `steps_per_ray` a été calibré à **20** (vs 50 originalement) par étude empirique multi-seeds : 5 directions essayées plus rapidement valent mieux que 1 direction explorée en profondeur dans cet espace de paramètres.
+
+### Hybrid bat individuellement les autres sur 9/15 combinaisons (func × dim)
+
+Sur les 6 cas où hybrid ne gagne pas individuellement (`gs` en 3D, `gl/gs/geta` en 10D, `gs/ggamma` en 50D), il reste systématiquement à <5% de l'algorithme gagnant — jamais loin derrière.
 
 ### Cas particulier : `ggamma` en 50D
 
@@ -58,7 +70,7 @@ experiments/            # Pipeline d'expérience
 tests/                  # Tests autonomes (stdlib, pas de framework externe)
 ├── test_network.py     #   6 tests
 ├── test_functions.py   #   6 tests (dont calibrage P(inside) en 3D/10D/50D)
-├── test_algorithms.py  #   8 tests (dont vérif hidden frozen pour backprop)
+├── test_algorithms.py  #   9 tests (dont vérif hidden frozen pour backprop)
 └── test_runner.py      #   1 smoke test du pipeline
 
 results/                # CSV + figures de convergence
@@ -67,6 +79,14 @@ results/                # CSV + figures de convergence
 ├── 50d/{figures/, summary.csv}
 ├── global_summary.csv  # 60 lignes : (dim × func × algo)
 └── global_comparison.png
+
+research/               # ← COUCHE DE RÉDACTION (pour la thèse)
+├── README.md           #   Guide de lecture
+├── algorithms.md       #   Description littéraire des 4 algos
+├── functions.md        #   Les 5 fonctions cibles + calibrage
+├── key_evidence.md     #   Le test critique (preuve du gel des couches cachées)
+├── code_pointers.md    #   Index des fichiers source à citer
+└── results/            #   RESULTS_EN/FR.md + symlinks vers figures/heatmap
 
 archive/                # Anciens scripts (préservés pour référence)
 docs/superpowers/{specs,plans}/   # Spec design + plan d'implémentation

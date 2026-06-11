@@ -1,4 +1,4 @@
-"""Test de runner.run_benchmark sur un cas minimal (dim=3, budget réduit)."""
+"""Test for runner.run_benchmark on a minimal case (dim=3, reduced budget)."""
 import sys, os, shutil
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

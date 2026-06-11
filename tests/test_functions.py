@@ -1,4 +1,4 @@
-"""Tests pour core.functions : 5 fonctions discontinues n-D + calibrage."""
+"""Tests for core.functions: 5 n-D discontinuous functions + calibration."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,7 +8,7 @@ from core.functions import FUNCTIONS, BOUNDARY_MASK, generate_dataset
 
 
 def _proportion_inside(func_name, dim, n=10000, seed=42):
-    """Proportion de points pour lesquels la frontière est 'vraie'."""
+    """Proportion of points for which the boundary is 'true'."""
     rng = np.random.RandomState(seed)
     X = rng.uniform(-2, 2, (n, dim))
     mask = BOUNDARY_MASK[func_name](X)
@@ -35,19 +35,19 @@ def test_function_finite_and_bounded():
 
 
 def test_boundary_proportion_calibrated():
-    """La proportion 'inside' doit être dans [0.20, 0.80] pour chaque (func, dim)."""
+    """The 'inside' proportion must be in [0.20, 0.80] for each (func, dim)."""
     failures = []
     for name in FUNCTIONS.keys():
         for dim in [3, 10, 50]:
             p = _proportion_inside(name, dim)
             if not (0.20 <= p <= 0.80):
                 failures.append(f"{name} dim={dim}: p_inside={p:.3f}")
-    assert not failures, "Calibrage hors plage:\n" + "\n".join(failures)
+    assert not failures, "Calibration out of range:\n" + "\n".join(failures)
     print("PASS: test_boundary_proportion_calibrated")
 
 
 def test_function_is_discontinuous():
-    """Vérifie qu'à la traversée de frontière, la fonction saute (différence > 0.1)."""
+    """Checks that crossing the boundary makes the function jump (difference > 0.1)."""
     for name in FUNCTIONS.keys():
         for dim in [3, 10]:
             rng = np.random.RandomState(0)
@@ -56,7 +56,7 @@ def test_function_is_discontinuous():
             mask = BOUNDARY_MASK[name](X)
             if mask.any() and (~mask).any():
                 gap = np.abs(y[mask].mean() - y[~mask].mean())
-                assert gap > 0.1, f"{name} dim={dim}: gap moyen trop petit ({gap:.4f})"
+                assert gap > 0.1, f"{name} dim={dim}: mean gap too small ({gap:.4f})"
     print("PASS: test_function_is_discontinuous")
 
 

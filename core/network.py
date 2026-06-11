@@ -1,15 +1,15 @@
-"""Réseau de neurones à activation Heaviside (gradient nul dans les couches cachées).
+"""Neural network with Heaviside activation (zero gradient in hidden layers).
 
-Le gradient zéro dans les couches cachées est intentionnel : c'est précisément
-ce qui fait échouer la rétropropagation, et qui justifie l'usage d'algorithmes
-sans gradient (Ray Shooting, GWO, Hybrid).
+The zero gradient in hidden layers is intentional: it is precisely what causes
+backpropagation to fail, and what motivates the use of gradient-free algorithms
+(Ray Shooting, GWO, Hybrid).
 """
 from typing import List, Tuple
 import numpy as np
 
 
 class HeavisideNetwork:
-    """Architecture : input -> Heaviside(hidden_1) -> ... -> Heaviside(hidden_n) -> Linear(output)."""
+    """Architecture: input -> Heaviside(hidden_1) -> ... -> Heaviside(hidden_n) -> Linear(output)."""
 
     def __init__(self, input_dim: int, hidden_sizes: List[int] = [16, 12, 8],
                  output_dim: int = 1, seed: int = None):

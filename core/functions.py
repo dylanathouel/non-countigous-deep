@@ -1,12 +1,12 @@
-"""Fonctions de test discontinues généralisées en dimension n (3, 10, 50).
+"""Discontinuous test functions generalized to n dimensions (3, 10, 50).
 
-Principe : les seuils géométriques sont calibrés pour que ~50% des points
-uniformes sur [-2,2]^D soient "intérieurs" à la frontière, peu importe D.
-Ça évite la dégénérescence en haute dimension (concentration de la mesure).
+Principle: geometric thresholds are calibrated so that ~50% of uniform points
+on [-2,2]^D are "inside" the boundary, regardless of D. This avoids the
+high-dimensional degeneracy (concentration of measure).
 
-Pour [-2,2]^D et x_i uniforme : E[x_i^2] = 4/3, E[||x||^2] = 4D/3.
-Les valeurs renvoyées sont normalisées (division par D ou sqrt(D)) pour
-éviter que les sinus/exp explosent en haute dim.
+For [-2,2]^D and uniform x_i: E[x_i^2] = 4/3, E[||x||^2] = 4D/3.
+Returned values are normalized (division by D or sqrt(D)) to prevent
+sines/exps from exploding in high dimension.
 """
 from typing import Callable, Dict, Tuple
 import numpy as np
@@ -21,11 +21,11 @@ def _sum_axis1(x: np.ndarray) -> np.ndarray:
 
 
 # ============================================================================
-# Frontières (BOUNDARY_MASK) — renvoient un booléen par sample
+# Boundaries (BOUNDARY_MASK) — return a boolean per sample
 # ============================================================================
 
 def _mask_gl(x: np.ndarray) -> np.ndarray:
-    """Hyperplan : x_D <= moyenne(x_1..x_{D-1})."""
+    """Hyperplane: x_D <= mean(x_1..x_{D-1})."""
     D = x.shape[1]
     last = x[:, -1]
     if D == 1:
@@ -35,14 +35,14 @@ def _mask_gl(x: np.ndarray) -> np.ndarray:
 
 
 def _mask_gs(x: np.ndarray) -> np.ndarray:
-    """Hypercube |x_i| <= alpha_gs(D) où alpha = 2 * 0.5^(1/D) -> P(in)=0.5."""
+    """Hypercube |x_i| <= alpha_gs(D) where alpha = 2 * 0.5^(1/D) -> P(in)=0.5."""
     D = x.shape[1]
     alpha = 2.0 * (0.5 ** (1.0 / D))
     return np.all(np.abs(x) <= alpha, axis=1)
 
 
 def _mask_geta(x: np.ndarray) -> np.ndarray:
-    """Région 'au-dessus' de la surface exponentielle atténuée."""
+    """Region 'above' the attenuated exponential surface."""
     D = x.shape[1]
     last = x[:, -1]
     threshold = np.exp(x[:, 0]) / (D ** 0.25)
@@ -50,13 +50,13 @@ def _mask_geta(x: np.ndarray) -> np.ndarray:
 
 
 def _mask_ggamma(x: np.ndarray) -> np.ndarray:
-    """Hypersphere ||x||^2 <= 4D/3 (médiane attendue)."""
+    """Hypersphere ||x||^2 <= 4D/3 (expected median)."""
     D = x.shape[1]
     return _norm_sq(x) <= (4.0 * D / 3.0)
 
 
 def _mask_complex(x: np.ndarray) -> np.ndarray:
-    """Hyperparaboloïde : x_D <= c * (somme x_i^2 (i<D) - (D-1)*4/3) avec c=1/(2*sqrt(D-1))."""
+    """Hyperparaboloid: x_D <= c * (sum x_i^2 (i<D) - (D-1)*4/3) with c=1/(2*sqrt(D-1))."""
     D = x.shape[1]
     if D == 1:
         return x[:, 0] <= 0
@@ -67,7 +67,7 @@ def _mask_complex(x: np.ndarray) -> np.ndarray:
 
 
 # ============================================================================
-# Fonctions cibles — valeurs réelles
+# Target functions — real values
 # ============================================================================
 
 def gl(x: np.ndarray) -> np.ndarray:
@@ -142,18 +142,18 @@ BOUNDARY_MASK: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
 }
 
 FUNCTION_DESCRIPTIONS = {
-    'gl': 'Hyperplan (x_D <= moyenne des autres)',
-    'gs': 'Hypercube calibré (P(in) ~ 0.5)',
-    'geta': 'Surface exponentielle atténuée',
-    'ggamma': 'Hypersphère de rayon √(4D/3)',
-    'complex': 'Hyperparaboloïde calibré',
+    'gl': 'Hyperplane (x_D <= mean of the others)',
+    'gs': 'Calibrated hypercube (P(in) ~ 0.5)',
+    'geta': 'Attenuated exponential surface',
+    'ggamma': 'Hypersphere of radius sqrt(4D/3)',
+    'complex': 'Calibrated hyperparaboloid',
 }
 
 
 def generate_dataset(func_name: str, n_samples: int = 2000, dim: int = 3,
                      seed: int = 42, bounds: Tuple[float, float] = (-2.0, 2.0)
                      ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Génère X, y train/val (80/20)."""
+    """Generates X, y for train/val split (80/20)."""
     if func_name not in FUNCTIONS:
         raise ValueError(f"Unknown function: {func_name}. Available: {list(FUNCTIONS.keys())}")
 

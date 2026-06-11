@@ -1,4 +1,4 @@
-"""Tests pour core.algorithms."""
+"""Tests for core.algorithms."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,7 +36,7 @@ def test_backprop_runs_and_records_history():
 
 
 def test_backprop_hidden_layers_frozen():
-    """Le gradient nul de Heaviside doit empêcher les couches cachées de bouger."""
+    """The zero Heaviside gradient must prevent hidden layers from changing."""
     from core.algorithms import train_backprop
     nn = HeavisideNetwork(3, [16, 12, 8], 1, seed=42)
     X_tr, y_tr, _, _ = _make_problem(dim=3)
@@ -69,12 +69,12 @@ def test_ray_shooting_history_monotone():
     X_tr, y_tr, _, _ = _make_problem(dim=3)
     _, history = train_ray_shooting(nn, X_tr, y_tr, eval_budget=300)
     for i in range(1, len(history)):
-        assert history[i] <= history[i - 1] + 1e-12, f"history[{i}] augmente"
+        assert history[i] <= history[i - 1] + 1e-12, f"history[{i}] increases"
     print("PASS: test_ray_shooting_history_monotone")
 
 
 def test_ray_shooting_steps20_beats_steps50():
-    """steps_per_ray=20 doit battre steps_per_ray=50 EN MOYENNE (10D, multi-seeds)."""
+    """steps_per_ray=20 must beat steps_per_ray=50 ON AVERAGE (10D, multi-seeds)."""
     from core.algorithms import train_ray_shooting
     X_tr, y_tr, _, _ = _make_problem(dim=10, n=500)
     seeds = [0, 1, 2, 7, 13]
@@ -90,8 +90,8 @@ def test_ray_shooting_steps20_beats_steps50():
     mean_50 = sum(f_50s) / len(f_50s)
     mean_20 = sum(f_20s) / len(f_20s)
     assert mean_20 < mean_50, (
-        f"steps=20 ({mean_20:.5f}) doit battre steps=50 ({mean_50:.5f}) "
-        f"sur {len(seeds)} seeds")
+        f"steps=20 ({mean_20:.5f}) must beat steps=50 ({mean_50:.5f}) "
+        f"over {len(seeds)} seeds")
     print(f"PASS: test_ray_shooting_steps20_beats_steps50 "
           f"(mean s50={mean_50:.5f}, mean s20={mean_20:.5f}, {len(seeds)} seeds)")
 
@@ -112,7 +112,7 @@ def test_gwo_decreases_mse():
 
 
 def test_gwo_seeds_current_position():
-    """Le premier loup doit être initialisé à la position courante du réseau."""
+    """The first wolf must be initialized to the network's current position."""
     from core.algorithms import train_gwo
     nn = HeavisideNetwork(3, [16, 12, 8], 1, seed=42)
     X_tr, y_tr, _, _ = _make_problem(dim=3)
@@ -138,10 +138,10 @@ def test_hybrid_seeded_runs():
 
 
 def test_hybrid_seeded_better_than_random_gwo():
-    """Sur un budget total identique, hybrid seedé doit faire <= 2x GWO seul.
+    """On the same total budget, seeded hybrid must be <= 2x GWO alone.
 
-    Le test n'exige pas que hybrid gagne (sur si peu d'évals, c'est aléatoire),
-    juste qu'il ne soit pas catastrophique."""
+    The test does not require hybrid to win (with so few evals it's random),
+    only that it not be catastrophic."""
     from core.algorithms import train_gwo, train_hybrid_seeded
     rng_seed = 7
     nn_gwo = HeavisideNetwork(3, [16, 12, 8], 1, seed=rng_seed)

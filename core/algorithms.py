@@ -1,10 +1,10 @@
-"""Algorithmes d'optimisation pour réseaux Heaviside.
+"""Optimization algorithms for Heaviside networks.
 
-API commune : tous retournent (final_mse, history)
-- final_mse : MSE final sur les données fournies (train, pas val)
-- history : List[float] de longueur eval_budget (MSE après chaque eval)
+Common API: all return (final_mse, history)
+- final_mse: final MSE on the provided data (train, not val)
+- history: List[float] of length eval_budget (MSE after each eval)
 
-Le budget est le nombre d'évaluations de la fonction de perte (forward pass).
+The budget is the number of loss-function evaluations (forward pass).
 """
 from typing import List, Tuple
 import numpy as np
@@ -16,14 +16,14 @@ def _mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 # ============================================================================
-# 1. BACKPROPAGATION (échec attendu — gradient nul dans hidden layers)
+# 1. BACKPROPAGATION (expected to fail — zero gradient in hidden layers)
 # ============================================================================
 
 def train_backprop(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
                    eval_budget: int = 25000, lr: float = 0.01
                    ) -> Tuple[float, List[float]]:
-    """Backprop standard. Le gradient de Heaviside est explicitement 0 dans les
-    couches cachées : seule la couche de sortie apprend. C'est l'échec à démontrer.
+    """Standard backprop. The Heaviside gradient is explicitly 0 in the
+    hidden layers: only the output layer learns. This is the failure to demonstrate.
     """
     history: List[float] = []
     m = X.shape[0]
@@ -46,13 +46,13 @@ def train_backprop(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
         db_out = np.sum(dZ_out, axis=0, keepdims=True)
 
         nn.layers[-1] = (W_out - lr * dW_out, b_out - lr * db_out)
-        # Les couches cachées NE SONT PAS mises à jour (gradient = 0)
+        # Hidden layers are NOT updated (gradient = 0)
 
     return history[-1], history
 
 
 # ============================================================================
-# 2. RAY SHOOTING (exploration directionnelle sans gradient)
+# 2. RAY SHOOTING (gradient-free directional exploration)
 # ============================================================================
 
 def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
@@ -60,17 +60,17 @@ def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
                        k_directions: int = 1,
                        bounds: Tuple[float, float] = (-2.0, 2.0), seed: int = None
                        ) -> Tuple[float, List[float]]:
-    """Ray Shooting greedy avec break précoce.
+    """Greedy Ray Shooting with early break.
 
-    À chaque ray : tire une cible aléatoire uniforme dans bounds, parcourt
-    steps_per_ray points le long du rayon, break dès qu'un point meilleur que
-    best est trouvé. La clé empirique : steps_per_ray=20 (par défaut) explore
-    plus de directions par budget qu'un steps_per_ray=50 (gain ~8-10% en
-    3D/10D, neutre en 50D).
+    For each ray: draws a uniform random target within bounds, walks
+    steps_per_ray points along the ray, breaks as soon as a point better than
+    best is found. Empirical key: steps_per_ray=20 (default) explores more
+    directions per budget than steps_per_ray=50 (~8-10% gain in 3D/10D,
+    neutral in 50D).
 
-    k_directions structure l'exploration en bursts de K directions consécutives.
-    Avec break greedy, c'est algorithmiquement équivalent à K rounds K=1, mais
-    le paramètre est conservé pour des extensions futures (best-of-K sans break,
+    k_directions structures exploration into bursts of K consecutive directions.
+    With greedy break, this is algorithmically equivalent to K rounds of K=1,
+    but the parameter is kept for future extensions (best-of-K without break,
     pattern search, etc.)."""
     rng = np.random.RandomState(seed)
     dim = nn.num_params()
@@ -97,7 +97,7 @@ def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
                 if score < best_score:
                     best_vec = candidate.copy()
                     best_score = score
-                    break  # passe à la direction suivante
+                    break  # move on to next direction
 
     nn.set_params(best_vec)
     history = history[:eval_budget]
@@ -105,14 +105,14 @@ def train_ray_shooting(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
 
 
 # ============================================================================
-# 3. GREY WOLF OPTIMIZER (méta-heuristique sans gradient)
+# 3. GREY WOLF OPTIMIZER (gradient-free meta-heuristic)
 # ============================================================================
 
 def train_gwo(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
               eval_budget: int = 25000, n_agents: int = 30,
               bounds: Tuple[float, float] = (-2.0, 2.0), seed: int = None
               ) -> Tuple[float, List[float]]:
-    """GWO standard. Le premier loup est seedé avec la position courante du réseau."""
+    """Standard GWO. The first wolf is seeded with the network's current position."""
     rng = np.random.RandomState(seed)
     dim = nn.num_params()
 
@@ -177,7 +177,7 @@ def train_gwo(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
 
 
 # ============================================================================
-# 4. HYBRID SEEDED (Ray puis GWO seedé autour de best_ray)
+# 4. HYBRID SEEDED (Ray then GWO seeded around best_ray)
 # ============================================================================
 
 def train_hybrid_seeded(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
@@ -186,13 +186,13 @@ def train_hybrid_seeded(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
                         bounds: Tuple[float, float] = (-2.0, 2.0),
                         steps_per_ray: int = 50, seed: int = None
                         ) -> Tuple[float, List[float]]:
-    """Phase 1 : Ray Shooting (ray_ratio*budget évals).
-    Phase 2 : GWO avec n_agents agents tous initialisés à best_ray + N(0, sigma*scale),
-              sauf le premier qui reste à best_ray exact (anti-régression)."""
+    """Phase 1: Ray Shooting (ray_ratio*budget evals).
+    Phase 2: GWO with n_agents agents all initialized to best_ray + N(0, sigma*scale),
+             except the first which stays at exact best_ray (no-regression)."""
     rng = np.random.RandomState(seed)
     scale = max(abs(bounds[0]), abs(bounds[1]))
 
-    # === Phase 1 : Ray ===
+    # === Phase 1: Ray ===
     ray_budget = int(ray_ratio * eval_budget)
     _, hist_ray = train_ray_shooting(nn, X, y, eval_budget=ray_budget,
                                      steps_per_ray=steps_per_ray, bounds=bounds,
@@ -200,13 +200,13 @@ def train_hybrid_seeded(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
     best_ray = nn.get_params()
     best_ray_score = _mse(y, nn.forward(X))
 
-    # === Phase 2 : GWO seedé ===
+    # === Phase 2: seeded GWO ===
     gwo_budget = eval_budget - ray_budget
     dim = nn.num_params()
 
     wolves = best_ray[None, :] + rng.normal(0.0, sigma * scale, (n_agents, dim))
     wolves = np.clip(wolves, bounds[0], bounds[1])
-    wolves[0] = best_ray  # garantir qu'on ne régresse pas
+    wolves[0] = best_ray  # ensure no regression
 
     history = list(hist_ray)
     scores = np.empty(n_agents)
@@ -224,7 +224,7 @@ def train_hybrid_seeded(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
     alpha = wolves[order[0]].copy(); alpha_score = scores[order[0]]
     beta = wolves[order[1]].copy(); beta_score = scores[order[1]]
     delta = wolves[order[2]].copy(); delta_score = scores[order[2]]
-    # Garantir que le meilleur connu reste best_ray si la population a régressé
+    # Ensure the known best stays at best_ray if the population regressed
     if best_ray_score < alpha_score:
         delta, delta_score = beta, beta_score
         beta, beta_score = alpha, alpha_score

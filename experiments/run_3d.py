@@ -1,4 +1,4 @@
-"""Benchmark dim=3 : python -m experiments.run_3d"""
+"""Benchmark dim=3: python -m experiments.run_3d"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

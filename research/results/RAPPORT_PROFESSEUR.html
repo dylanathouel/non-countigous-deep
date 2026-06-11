@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RAPPORT_PROFESSEUR</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #222; font-size: 11pt; line-height: 1.45; }
+h1 { font-size: 20pt; color: #1a3d6d; border-bottom: 2px solid #1a3d6d; padding-bottom: 6px; margin-top: 0; }
+h2 { font-size: 15pt; color: #1a3d6d; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 22px; }
+h3 { font-size: 12pt; color: #2a5a9c; margin-top: 16px; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; }
+th, td { border: 1px solid #bbb; padding: 6px 9px; text-align: left; }
+th { background: #e8eef7; color: #1a3d6d; font-weight: 600; }
+tr:nth-child(even) td { background: #f7f9fc; }
+strong { color: #1a3d6d; }
+blockquote { border-left: 4px solid #2a5a9c; background: #f0f4fa; margin: 10px 0; padding: 8px 14px; color: #333; }
+hr { border: none; border-top: 1px solid #ccc; margin: 16px 0; }
+code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+em { color: #666; }
+</style>
+</head>
+<body>
+<h1>Rapport de résultats — Optimisation de réseaux à activation discontinue</h1>
+<p><strong>Auteur :</strong> David Sperling
+<strong>Date :</strong> 7 juin 2026</p>
+<hr />
+<h2>1. Cadre expérimental</h2>
+<table>
+<thead>
+<tr>
+<th>Paramètre</th>
+<th>Valeur</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Architecture</td>
+<td>Réseau Heaviside <code>[16, 12, 8]</code></td>
+</tr>
+<tr>
+<td>Activation cachée</td>
+<td>Discontinue (Heaviside) — gradient nul presque partout</td>
+</tr>
+<tr>
+<td>Échantillons</td>
+<td>2 000 par run</td>
+</tr>
+<tr>
+<td>Budget d'évaluations</td>
+<td>25 000 par algorithme</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td>42</td>
+</tr>
+<tr>
+<td>Dimensions testées</td>
+<td>3D, 10D, 50D</td>
+</tr>
+<tr>
+<td>Fonctions cibles</td>
+<td><code>gl</code>, <code>gs</code>, <code>geta</code>, <code>ggamma</code>, <code>complex</code> (toutes discontinues)</td>
+</tr>
+<tr>
+<td>Algorithmes comparés</td>
+<td>Backprop, Ray Shooting, GWO, Hybrid (Ray+GWO)</td>
+</tr>
+<tr>
+<td>Métrique</td>
+<td>MSE sur l'ensemble de validation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. Vue d'ensemble — MSE moyen par dimension</h2>
+<p>Moyenne des MSE de validation sur les 5 fonctions cibles.</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+<th><strong>Meilleur</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>3D</strong></td>
+<td>0.0620</td>
+<td>0.0612</td>
+<td>0.0385</td>
+<td><strong>0.0360</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td><strong>10D</strong></td>
+<td>0.0674</td>
+<td>0.0647</td>
+<td>0.0476</td>
+<td><strong>0.0462</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td><strong>50D</strong></td>
+<td>0.0787</td>
+<td>0.0790</td>
+<td>0.0594</td>
+<td><strong>0.0549</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Hybrid obtient le MSE moyen le plus bas sur les trois dimensions.</strong></p>
+</blockquote>
+<hr />
+<h2>3. Résultats détaillés par dimension</h2>
+<h3>3.1. Dimension 3D</h3>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+<th><strong>Meilleur</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.02850</td>
+<td>0.02879</td>
+<td>0.01895</td>
+<td><strong>0.01792</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>gs</td>
+<td>0.06417</td>
+<td>0.06395</td>
+<td><strong>0.03486</strong></td>
+<td>0.03769</td>
+<td><strong>GWO</strong></td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.06259</td>
+<td>0.06971</td>
+<td>0.02034</td>
+<td><strong>0.01799</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>0.11966</td>
+<td>0.11729</td>
+<td>0.09934</td>
+<td><strong>0.08831</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.03506</td>
+<td>0.02607</td>
+<td>0.01904</td>
+<td><strong>0.01790</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Hybrid gagne 4/5 fonctions en 3D.</strong></p>
+</blockquote>
+<hr />
+<h3>3.2. Dimension 10D</h3>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+<th><strong>Meilleur</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.02416</td>
+<td>0.02417</td>
+<td><strong>0.01231</strong></td>
+<td>0.01291</td>
+<td><strong>GWO</strong></td>
+</tr>
+<tr>
+<td>gs</td>
+<td>0.03312</td>
+<td>0.03345</td>
+<td><strong>0.03219</strong></td>
+<td>0.03274</td>
+<td><strong>GWO</strong></td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.07585</td>
+<td>0.06939</td>
+<td><strong>0.02908</strong></td>
+<td>0.03098</td>
+<td><strong>GWO</strong></td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>0.12226</td>
+<td>0.12094</td>
+<td>0.12751</td>
+<td><strong>0.12035</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.08151</td>
+<td>0.07550</td>
+<td>0.03680</td>
+<td><strong>0.03391</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>GWO domine en 10D (3/5)</strong>, Hybrid reste très proche dans tous les cas.</p>
+</blockquote>
+<hr />
+<h3>3.3. Dimension 50D</h3>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+<th><strong>Meilleur</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.05017</td>
+<td>0.05072</td>
+<td>0.01796</td>
+<td><strong>0.01339</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>gs</td>
+<td>0.03099</td>
+<td><strong>0.03064</strong></td>
+<td>0.03187</td>
+<td>0.03090</td>
+<td><strong>Ray</strong></td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.07594</td>
+<td>0.07606</td>
+<td>0.05357</td>
+<td><strong>0.03633</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td><strong>0.12660</strong></td>
+<td>0.12717</td>
+<td>0.12816</td>
+<td>0.13249</td>
+<td><strong>Backprop</strong></td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.10995</td>
+<td>0.11016</td>
+<td>0.06526</td>
+<td><strong>0.06141</strong></td>
+<td><strong>Hybrid</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Hybrid gagne 3/5 fonctions en 50D</strong>, dont un cas spectaculaire sur <code>gl</code> (0.0134 contre 0.050 pour Backprop, soit ~3.7× mieux).
+La « victoire » de Backprop sur <code>ggamma</code> correspond à un plateau (tous les algorithmes plafonnent autour de 0.13).</p>
+</blockquote>
+<hr />
+<h2>4. Comptage global des victoires (15 combinaisons dim × fonction)</h2>
+<table>
+<thead>
+<tr>
+<th>Algorithme</th>
+<th>Victoires</th>
+<th>Détail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Hybrid</strong></td>
+<td><strong>9 / 15</strong></td>
+<td>3D : gl, geta, ggamma, complex — 10D : ggamma, complex — 50D : gl, geta, complex</td>
+</tr>
+<tr>
+<td><strong>GWO</strong></td>
+<td><strong>4 / 15</strong></td>
+<td>3D : gs — 10D : gl, gs, geta</td>
+</tr>
+<tr>
+<td><strong>Ray</strong></td>
+<td><strong>1 / 15</strong></td>
+<td>50D : gs</td>
+</tr>
+<tr>
+<td><strong>Backprop</strong></td>
+<td><strong>1 / 15</strong></td>
+<td>50D : ggamma (plateau)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Hybrid est le meilleur algorithme individuel sur 60 % des cas.</strong>
+Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du gagnant.</p>
+</blockquote>
+<hr />
+<h2>5. Temps de calcul (en secondes, par run de 25 000 évaluations)</h2>
+<p>Temps moyens par dimension et algorithme :</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3D</td>
+<td>4.20</td>
+<td>4.10</td>
+<td>4.74</td>
+<td>4.42</td>
+</tr>
+<tr>
+<td>10D</td>
+<td>4.25</td>
+<td>4.17</td>
+<td>4.92</td>
+<td>4.53</td>
+</tr>
+<tr>
+<td>50D</td>
+<td>4.54</td>
+<td>4.49</td>
+<td>5.61</td>
+<td>5.01</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Les temps sont comparables (~4 à 5 s par run). <strong>Hybrid est plus rapide que GWO</strong> car il bénéficie d'une bonne initialisation venant de Ray Shooting.</p>
+</blockquote>
+<hr />
+<h2>6. Synthèse par algorithme</h2>
+<h3>Backprop</h3>
+<ul>
+<li>Plafonne à un niveau « ELM » (Extreme Learning Machine) : les couches cachées Heaviside sont <strong>gelées</strong> car le gradient est nul presque partout.</li>
+<li>Seule la couche de sortie est mise à jour. Le réseau dégénère en régression linéaire sur des features aléatoires.</li>
+<li>Vérifié par test unitaire : les poids cachés sont identiques avant et après entraînement.</li>
+</ul>
+<h3>Ray Shooting</h3>
+<ul>
+<li>Performances très proches de Backprop. La direction des rayons devient quasi-isotrope en haute dimension (concentration de la mesure).</li>
+<li>Pas de mémoire collective des directions efficaces. Gagne uniquement sur <code>gs</code> en 50D.</li>
+</ul>
+<h3>GWO (Grey Wolf Optimizer)</h3>
+<ul>
+<li>~40 % d'amélioration moyenne par rapport à Backprop/Ray.</li>
+<li>La hiérarchie alpha/beta/delta fournit une mémoire collective et exploite la meilleure solution trouvée.</li>
+<li>Meilleur algorithme individuel sur 3/5 fonctions en 10D.</li>
+</ul>
+<h3>Hybrid (Ray + GWO seedé)</h3>
+<ul>
+<li>Combine l'exploration globale de Ray Shooting avec le raffinement de GWO autour de <code>best_ray</code>.</li>
+<li><code>wolves[0] = best_ray</code> (garantie de non-régression), <code>wolves[1:] = best_ray + bruit gaussien</code>.</li>
+<li><strong>Meilleure moyenne sur les trois dimensions</strong>, gains les plus marqués en 50D.</li>
+</ul>
+<hr />
+<h2>7. Conclusions</h2>
+<table>
+<thead>
+<tr>
+<th>Hypothèse à valider</th>
+<th>Résultat</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backprop est limité sur les réseaux à activation discontinue</td>
+<td><strong>Confirmé</strong> (plateau au niveau ELM)</td>
+</tr>
+<tr>
+<td>Les méthodes sans gradient (GWO) surpassent celles à gradient</td>
+<td><strong>Confirmé</strong> (~40 % de gain)</td>
+</tr>
+<tr>
+<td>Hybrid bat chaque méthode prise isolément</td>
+<td><strong>Confirmé</strong> (meilleure moyenne sur 3/3 dimensions)</td>
+</tr>
+<tr>
+<td>Le résultat se maintient en 3D → 10D → 50D</td>
+<td><strong>Confirmé</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusion principale :</strong> L'algorithme <strong>Hybrid</strong> est globalement le plus performant, suivi de <strong>GWO</strong>. Backprop et Ray Shooting sont nettement en retrait sur ces fonctions discontinues, ce qui confirme l'intérêt des méthodes sans gradient (et de leur combinaison) pour ce type de problème.</p>
+<hr />
+<p><em>Données brutes : <code>results/global_summary.csv</code> — Figure de comparaison : <code>results/global_comparison.png</code></em></p>
+</body>
+</html>

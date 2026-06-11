@@ -1,5 +1,5 @@
-"""Pipeline d'expérience : pour une dimension donnée, exécute les 4 algos sur
-chacune des 5 fonctions, sauvegarde CSV + figures de convergence."""
+"""Experiment pipeline: for a given dimension, runs the 4 algorithms on each
+of the 5 functions, saves CSV + convergence figures."""
 import os
 import time
 from typing import List, Optional
@@ -20,10 +20,10 @@ HIDDEN_SIZES = [16, 12, 8]
 ALGO_NAMES = ['backprop', 'ray', 'gwo', 'hybrid']
 ALGO_COLORS = {'backprop': 'red', 'ray': 'green', 'gwo': 'blue', 'hybrid': 'purple'}
 ALGO_LABELS = {
-    'backprop': 'Backprop (échec attendu)',
+    'backprop': 'Backprop (expected to fail)',
     'ray': 'Ray Shooting',
     'gwo': 'GWO',
-    'hybrid': 'Hybrid (Ray + GWO seedé)',
+    'hybrid': 'Hybrid (Ray + seeded GWO)',
 }
 
 
@@ -52,8 +52,8 @@ def _plot_convergence(histories: dict, title: str, save_path: str):
             plt.plot(h, color=ALGO_COLORS[algo], label=ALGO_LABELS[algo],
                      linewidth=1.5, alpha=0.85)
     plt.yscale('log')
-    plt.xlabel('Évaluations de la fonction de perte')
-    plt.ylabel('MSE (échelle log)')
+    plt.xlabel('Loss function evaluations')
+    plt.ylabel('MSE (log scale)')
     plt.title(title)
     plt.legend(loc='upper right')
     plt.grid(True, alpha=0.3)
@@ -65,19 +65,19 @@ def _plot_convergence(histories: dict, title: str, save_path: str):
 def run_benchmark(dim: int, output_dir: str, eval_budget: int = 25000,
                   n_samples: int = 2000, func_names: Optional[List[str]] = None,
                   seed: int = 42) -> pd.DataFrame:
-    """Lance les 4 algos sur chaque fonction pour une dimension donnée."""
+    """Runs the 4 algorithms on each function for a given dimension."""
     if func_names is None:
         func_names = list(FUNCTIONS.keys())
     os.makedirs(os.path.join(output_dir, 'figures'), exist_ok=True)
 
     rows = []
     print(f"\n{'='*72}")
-    print(f"BENCHMARK dim={dim} | budget={eval_budget} évals | {n_samples} samples")
-    print(f"Fonctions : {func_names}")
+    print(f"BENCHMARK dim={dim} | budget={eval_budget} evals | {n_samples} samples")
+    print(f"Functions: {func_names}")
     print(f"{'='*72}")
 
     for func_name in func_names:
-        print(f"\n>>> Fonction : {func_name}")
+        print(f"\n>>> Function: {func_name}")
         X_tr, y_tr, X_va, y_va = generate_dataset(func_name, n_samples=n_samples,
                                                     dim=dim, seed=seed)
         y_min, y_max = float(y_tr.min()), float(y_tr.max())
@@ -104,18 +104,18 @@ def run_benchmark(dim: int, output_dir: str, eval_budget: int = 25000,
 
         plot_path = os.path.join(output_dir, 'figures', f'{func_name}.png')
         _plot_convergence(histories,
-                          title=f"Convergence — {func_name} (dim={dim})",
+                          title=f"Convergence - {func_name} (dim={dim})",
                           save_path=plot_path)
 
     df = pd.DataFrame(rows)
     csv_path = os.path.join(output_dir, 'summary.csv')
     df.to_csv(csv_path, index=False)
-    print(f"\nSauvegardé : {csv_path}")
+    print(f"\nSaved: {csv_path}")
 
     pivot = df.pivot(index='func', columns='algo', values='mse_val')
-    print("\nMSE val par (func, algo) :")
+    print("\nMSE val per (func, algo):")
     print(pivot.to_string(float_format=lambda v: f"{v:.5f}"))
-    print(f"\nMeilleur algo par fonction :")
+    print(f"\nBest algo per function:")
     for func in df['func'].unique():
         sub = df[df['func'] == func].sort_values('mse_val').iloc[0]
         print(f"  {func:<10} -> {sub['algo']:<10} (mse_val={sub['mse_val']:.5f})")
