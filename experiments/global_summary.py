@@ -52,6 +52,11 @@ def main():
     print(f"\nbackprop fails (>=5x) on {val_df['bp_fails (>=5x)'].sum()}/{len(val_df)} combinations.")
     print(f"hybrid is the best on {val_df['hybrid_is_best'].sum()}/{len(val_df)} combinations.")
 
+    if 'r2_val' in df.columns:
+        r2_pivot = df.groupby(['dim', 'algo'])['r2_val'].mean().unstack()[ALGOS]
+        print("\n=== Mean R²_val per (dim, algo) — 0 = learned nothing beyond the mean ===")
+        print(r2_pivot.to_string(float_format=lambda v: f"{v:.3f}"))
+
     pivot = df.groupby(['dim', 'algo'])['mse_val'].mean().unstack()
     pivot = pivot[ALGOS]
     fig, ax = plt.subplots(figsize=(8, 4))

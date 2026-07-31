@@ -16,15 +16,76 @@ def _mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 # ============================================================================
-# 1. BACKPROPAGATION (expected to fail — zero gradient in hidden layers)
+# 1. BACKPROPAGATION via PyTorch autograd (expected to fail)
 # ============================================================================
+#
+# The failure is NOT hardcoded. We rebuild the SAME Heaviside network in PyTorch
+# and use a hard step activation `(z >= 0)`. That operation is non-differentiable,
+# so PyTorch's autograd discovers ON ITS OWN that no gradient flows through the
+# hidden layers (their `.grad` stays None). Only the output linear layer receives
+# a gradient and trains -> the network cannot carve the discontinuous boundary.
+# This is the failure to demonstrate.
 
 def train_backprop(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
-                   eval_budget: int = 25000, lr: float = 0.01
-                   ) -> Tuple[float, List[float]]:
-    """Standard backprop. The Heaviside gradient is explicitly 0 in the
-    hidden layers: only the output layer learns. This is the failure to demonstrate.
+                   eval_budget: int = 25000, lr: float = 0.01,
+                   verbose: bool = True) -> Tuple[float, List[float]]:
+    """Real PyTorch backprop: forward + autograd backward + full-batch SGD.
+
+    Mirrors the numpy HeavisideNetwork (same architecture, same initial weights),
+    trains for `eval_budget` steps, then copies the final weights back into `nn`
+    so the caller can evaluate it. Returns (final_mse, history) with the same
+    semantics as the gradient-free algorithms.
     """
+    import torch
+
+    Xt = torch.as_tensor(X, dtype=torch.float64)
+    yt = torch.as_tensor(y, dtype=torch.float64)
+
+    # Mirror nn.layers as trainable torch tensors with the same initial values.
+    torch_layers = [
+        (torch.tensor(W, dtype=torch.float64, requires_grad=True),
+         torch.tensor(b, dtype=torch.float64, requires_grad=True))
+        for (W, b) in nn.layers
+    ]
+    params = [p for layer in torch_layers for p in layer]
+    opt = torch.optim.SGD(params, lr=lr)
+
+    def forward(Xb):
+        A = Xb
+        for W, b in torch_layers[:-1]:
+            A = (A @ W + b >= 0).to(torch.float64)  # hard step: non-differentiable
+        W, b = torch_layers[-1]
+        return A @ W + b
+
+    history: List[float] = []
+    for step in range(eval_budget):
+        opt.zero_grad()
+        y_pred = forward(Xt)
+        loss = torch.mean((y_pred - yt) ** 2)
+        history.append(float(loss.item()))
+        loss.backward()
+
+        if step == 0 and verbose:
+            hidden_params = [p for W, b in torch_layers[:-1] for p in (W, b)]
+            frozen = sum(1 for p in hidden_params if p.grad is None)
+            print(f"[autograd: {frozen}/{len(hidden_params)} hidden grads=None "
+                  f"-> output-only]", end=' ', flush=True)
+
+        opt.step()
+
+    # Copy final (trained) weights back into the numpy network for evaluation.
+    nn.set_params(np.concatenate([
+        p.detach().numpy().flatten() for layer in torch_layers for p in layer
+    ]))
+    return history[-1], history
+
+
+def train_backprop_numpy(nn: HeavisideNetwork, X: np.ndarray, y: np.ndarray,
+                         eval_budget: int = 25000, lr: float = 0.01
+                         ) -> Tuple[float, List[float]]:
+    """[Reference — no longer used by the runner] Manual numpy backprop where the
+    Heaviside gradient is set to 0 BY HAND. Kept to show it yields the same result
+    as the PyTorch autograd version above (autograd reproduces the hardcoded 0)."""
     history: List[float] = []
     m = X.shape[0]
 

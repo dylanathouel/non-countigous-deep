@@ -40,7 +40,8 @@ def _train(algo: str, nn, X_tr, y_tr, eval_budget, seed):
     raise ValueError(f"Unknown algo: {algo}")
 
 
-def _plot_convergence(histories: dict, title: str, save_path: str):
+def _plot_convergence(histories: dict, title: str, save_path: str,
+                      baseline: float = None):
     plt.figure(figsize=(10, 6))
     for algo in ALGO_NAMES:
         h = histories[algo]
@@ -51,6 +52,9 @@ def _plot_convergence(histories: dict, title: str, save_path: str):
         else:
             plt.plot(h, color=ALGO_COLORS[algo], label=ALGO_LABELS[algo],
                      linewidth=1.5, alpha=0.85)
+    if baseline is not None:
+        plt.axhline(baseline, color='gray', linestyle='--', linewidth=1.3,
+                    alpha=0.8, label='Baseline = prédire la moyenne (R²=0)')
     plt.yscale('log')
     plt.xlabel('Loss function evaluations')
     plt.ylabel('MSE (log scale)')
@@ -85,6 +89,12 @@ def run_benchmark(dim: int, output_dir: str, eval_budget: int = 25000,
         y_tr_n = (y_tr - y_min) / denom
         y_va_n = (y_va - y_min) / denom
 
+        # Baseline = MSE of the constant "predict the mean" model = variance of y.
+        # R2 = 1 - MSE/baseline tells how much structure is actually explained
+        # (R2=0 -> learned nothing beyond the mean; R2=1 -> perfect).
+        baseline_train = float(np.var(y_tr_n))
+        baseline_val = float(np.var(y_va_n))
+
         histories = {}
         for algo in ALGO_NAMES:
             print(f"  [{algo:>8}]...", end=' ', flush=True)
@@ -94,18 +104,22 @@ def run_benchmark(dim: int, output_dir: str, eval_budget: int = 25000,
                                            eval_budget=eval_budget, seed=seed)
             elapsed = time.time() - t0
             mse_val = float(np.mean((y_va_n - nn.forward(X_va)) ** 2))
+            r2_train = 1.0 - final_train / baseline_train if baseline_train > 0 else float('nan')
+            r2_val = 1.0 - mse_val / baseline_val if baseline_val > 0 else float('nan')
             histories[algo] = history
             rows.append({
                 'dim': dim, 'func': func_name, 'algo': algo,
                 'mse_train': final_train, 'mse_val': mse_val,
+                'baseline_train': baseline_train, 'baseline_val': baseline_val,
+                'r2_train': r2_train, 'r2_val': r2_val,
                 'time_s': elapsed, 'n_evals': len(history),
             })
-            print(f"mse_val={mse_val:.5f} (train={final_train:.5f}) [{elapsed:.1f}s]")
+            print(f"mse_val={mse_val:.5f} (train={final_train:.5f}, R²={r2_val:.2f}) [{elapsed:.1f}s]")
 
         plot_path = os.path.join(output_dir, 'figures', f'{func_name}.png')
         _plot_convergence(histories,
                           title=f"Convergence - {func_name} (dim={dim})",
-                          save_path=plot_path)
+                          save_path=plot_path, baseline=baseline_train)
 
     df = pd.DataFrame(rows)
     csv_path = os.path.join(output_dir, 'summary.csv')
@@ -115,6 +129,9 @@ def run_benchmark(dim: int, output_dir: str, eval_budget: int = 25000,
     pivot = df.pivot(index='func', columns='algo', values='mse_val')
     print("\nMSE val per (func, algo):")
     print(pivot.to_string(float_format=lambda v: f"{v:.5f}"))
+    pivot_r2 = df.pivot(index='func', columns='algo', values='r2_val')
+    print("\nR² val per (func, algo) — 0 = n'a rien appris au-delà de la moyenne:")
+    print(pivot_r2.to_string(float_format=lambda v: f"{v:.3f}"))
     print(f"\nBest algo per function:")
     for func in df['func'].unique():
         sub = df[df['func'] == func].sort_values('mse_val').iloc[0]

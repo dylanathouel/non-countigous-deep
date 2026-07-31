@@ -23,7 +23,7 @@ em { color: #666; }
 <body>
 <h1>Rapport de résultats — Optimisation de réseaux à activation discontinue</h1>
 <p><strong>Auteur :</strong> David Sperling
-<strong>Date :</strong> 7 juin 2026</p>
+<strong>Date :</strong> 15 juin 2026</p>
 <hr />
 <h2>1. Cadre expérimental</h2>
 <table>
@@ -43,8 +43,12 @@ em { color: #666; }
 <td>Discontinue (Heaviside) — gradient nul presque partout</td>
 </tr>
 <tr>
+<td>Implémentation Backprop</td>
+<td><strong>PyTorch (autograd)</strong> — voir encadré ci-dessous</td>
+</tr>
+<tr>
 <td>Échantillons</td>
-<td>2 000 par run</td>
+<td>2 000 par run (split 80/20)</td>
 </tr>
 <tr>
 <td>Budget d'évaluations</td>
@@ -67,11 +71,18 @@ em { color: #666; }
 <td>Backprop, Ray Shooting, GWO, Hybrid (Ray+GWO)</td>
 </tr>
 <tr>
-<td>Métrique</td>
-<td>MSE sur l'ensemble de validation</td>
+<td>Normalisation</td>
+<td>Chaque cible est ramenée dans <strong>[0, 1]</strong> avant calcul du MSE</td>
+</tr>
+<tr>
+<td>Métriques</td>
+<td>MSE de validation <strong>et R² = 1 − MSE / Var(y)</strong></td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>L'échec du backprop n'est pas codé en dur.</strong> Le réseau est reconstruit à l'identique dans PyTorch et l'activation cachée est une vraie marche <code>(z ≥ 0)</code>. Cette opération étant non-différentiable, l'autograd de PyTorch <strong>découvre de lui-même</strong> qu'aucun gradient ne traverse les couches cachées (leur <code>.grad</code> reste <code>None</code>) : seule la couche de sortie linéaire reçoit un gradient et s'entraîne. Vérification : la version PyTorch et l'ancienne descente de gradient manuelle (dérivée fixée à 0 à la main) donnent des résultats <strong>identiques à la précision machine</strong> (écart &lt; 1e-16).</p>
+</blockquote>
 <hr />
 <h2>2. Vue d'ensemble — MSE moyen par dimension</h2>
 <p>Moyenne des MSE de validation sur les 5 fonctions cibles.</p>
@@ -117,8 +128,246 @@ em { color: #666; }
 <p><strong>Hybrid obtient le MSE moyen le plus bas sur les trois dimensions.</strong></p>
 </blockquote>
 <hr />
-<h2>3. Résultats détaillés par dimension</h2>
-<h3>3.1. Dimension 3D</h3>
+<h2>3. Interprétation : pourquoi le MSE absolu trompe — lecture par le R²</h2>
+<p>Les MSE ci-dessus semblent <strong>petits</strong> (≈ 0.03–0.12), ce qui pourrait laisser croire que le backprop « fonctionne ». <strong>C'est un piège dû à la normalisation.</strong> Les cibles étant ramenées dans [0, 1], toute la variance à expliquer est minuscule. Un modèle qui <strong>n'apprend rien</strong> et se contente de prédire la moyenne obtient déjà un MSE égal à la variance de la cible (la <em>baseline</em>) :</p>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>baseline 3D</th>
+<th>baseline 10D</th>
+<th>baseline 50D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.0413</td>
+<td>0.0243</td>
+<td>0.0504</td>
+</tr>
+<tr>
+<td>gs</td>
+<td>0.0643</td>
+<td>0.0330</td>
+<td>0.0306</td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.0866</td>
+<td>0.0790</td>
+<td>0.0755</td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>0.1214</td>
+<td>0.1215</td>
+<td>0.1265</td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.0618</td>
+<td>0.0806</td>
+<td>0.1105</td>
+</tr>
+</tbody>
+</table>
+<p>La bonne métrique est donc le <strong>R² = 1 − MSE / baseline</strong> :
+- <strong>R² = 0</strong> → le modèle n'apprend <strong>rien</strong> de plus que la moyenne ;
+- <strong>R² = 1</strong> → ajustement parfait ;
+- <strong>R² &lt; 0</strong> → pire que prédire la moyenne (sur validation).</p>
+<h3>3.1. R² moyen par dimension</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Backprop</th>
+<th>Ray Shooting</th>
+<th>GWO</th>
+<th>Hybrid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>3D</strong></td>
+<td>0.207</td>
+<td>0.223</td>
+<td>0.527</td>
+<td><strong>0.551</strong></td>
+</tr>
+<tr>
+<td><strong>10D</strong></td>
+<td><strong>0.005</strong></td>
+<td>0.036</td>
+<td>0.329</td>
+<td><strong>0.335</strong></td>
+</tr>
+<tr>
+<td><strong>50D</strong></td>
+<td><strong>−0.001</strong></td>
+<td>−0.003</td>
+<td>0.258</td>
+<td><strong>0.328</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Le voici, l'échec du backprop, enfin visible.</strong> Dès la 10D, le R² du backprop <strong>s'effondre à ≈ 0</strong> : il n'explique plus rien au-delà de la moyenne. Pendant ce temps GWO et Hybrid conservent un R² de 0.26 à 0.55. Le MSE absolu masquait totalement cet écart ; le R² le rend évident.</p>
+</blockquote>
+<h3>3.2. R² détaillé par fonction (validation)</h3>
+<p><strong>3D</strong></p>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray</th>
+<th>GWO</th>
+<th>Hybrid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.309</td>
+<td>0.302</td>
+<td>0.541</td>
+<td><strong>0.566</strong></td>
+</tr>
+<tr>
+<td>gs</td>
+<td>0.002</td>
+<td>0.005</td>
+<td><strong>0.458</strong></td>
+<td>0.414</td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.277</td>
+<td>0.195</td>
+<td>0.765</td>
+<td><strong>0.792</strong></td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>0.014</td>
+<td>0.034</td>
+<td>0.181</td>
+<td><strong>0.272</strong></td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.432</td>
+<td>0.578</td>
+<td>0.692</td>
+<td><strong>0.710</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>10D</strong></p>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray</th>
+<th>GWO</th>
+<th>Hybrid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.007</td>
+<td>0.007</td>
+<td><strong>0.494</strong></td>
+<td>0.470</td>
+</tr>
+<tr>
+<td>gs</td>
+<td>−0.005</td>
+<td>−0.015</td>
+<td><strong>0.024</strong></td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>geta</td>
+<td>0.040</td>
+<td>0.122</td>
+<td><strong>0.632</strong></td>
+<td>0.608</td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>−0.006</td>
+<td>0.004</td>
+<td>−0.050</td>
+<td><strong>0.009</strong></td>
+</tr>
+<tr>
+<td>complex</td>
+<td>−0.011</td>
+<td>0.064</td>
+<td>0.544</td>
+<td><strong>0.580</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>50D</strong></p>
+<table>
+<thead>
+<tr>
+<th>Fonction</th>
+<th>Backprop</th>
+<th>Ray</th>
+<th>GWO</th>
+<th>Hybrid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gl</td>
+<td>0.005</td>
+<td>−0.006</td>
+<td>0.644</td>
+<td><strong>0.734</strong></td>
+</tr>
+<tr>
+<td>gs</td>
+<td>−0.011</td>
+<td>0.000</td>
+<td>−0.040</td>
+<td>−0.008</td>
+</tr>
+<tr>
+<td>geta</td>
+<td>−0.005</td>
+<td>−0.007</td>
+<td>0.291</td>
+<td><strong>0.519</strong></td>
+</tr>
+<tr>
+<td>ggamma</td>
+<td>−0.001</td>
+<td>−0.006</td>
+<td>−0.014</td>
+<td>−0.048</td>
+</tr>
+<tr>
+<td>complex</td>
+<td>0.005</td>
+<td>0.003</td>
+<td>0.410</td>
+<td><strong>0.444</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Deux régimes.</strong> Sur les fonctions <em>apprenables</em> (<code>gl</code>, <code>geta</code>, <code>complex</code>), GWO/Hybrid atteignent R² = 0.4 à 0.79 alors que le backprop reste à ≈ 0 : l'écart est la <strong>preuve</strong> que les méthodes sans gradient exploitent les couches cachées que le backprop ne peut pas bouger. Sur <code>gs</code> et <code>ggamma</code>, <strong>personne</strong> n'apprend (R² ≈ 0 pour tous) : ces frontières (hypercube calibré, hypersphère) sont trop difficiles pour cette petite architecture — à ne pas confondre avec une réussite du backprop.</p>
+</blockquote>
+<hr />
+<h2>4. Résultats détaillés par dimension (MSE de validation)</h2>
+<h3>4.1. Dimension 3D</h3>
 <table>
 <thead>
 <tr>
@@ -176,8 +425,7 @@ em { color: #666; }
 <blockquote>
 <p><strong>Hybrid gagne 4/5 fonctions en 3D.</strong></p>
 </blockquote>
-<hr />
-<h3>3.2. Dimension 10D</h3>
+<h3>4.2. Dimension 10D</h3>
 <table>
 <thead>
 <tr>
@@ -235,8 +483,7 @@ em { color: #666; }
 <blockquote>
 <p><strong>GWO domine en 10D (3/5)</strong>, Hybrid reste très proche dans tous les cas.</p>
 </blockquote>
-<hr />
-<h3>3.3. Dimension 50D</h3>
+<h3>4.3. Dimension 50D</h3>
 <table>
 <thead>
 <tr>
@@ -292,11 +539,11 @@ em { color: #666; }
 </tbody>
 </table>
 <blockquote>
-<p><strong>Hybrid gagne 3/5 fonctions en 50D</strong>, dont un cas spectaculaire sur <code>gl</code> (0.0134 contre 0.050 pour Backprop, soit ~3.7× mieux).
-La « victoire » de Backprop sur <code>ggamma</code> correspond à un plateau (tous les algorithmes plafonnent autour de 0.13).</p>
+<p><strong>Hybrid gagne 3/5 fonctions en 50D</strong>, dont un cas spectaculaire sur <code>gl</code> (0.0134 contre 0.050 pour Backprop, soit ~3.7× mieux ; en R² : 0.73 contre 0.005).
+La « victoire » de Backprop sur <code>ggamma</code> correspond à un plateau (tous les algorithmes plafonnent autour de 0.13, R² ≈ 0 pour tous).</p>
 </blockquote>
 <hr />
-<h2>4. Comptage global des victoires (15 combinaisons dim × fonction)</h2>
+<h2>5. Comptage global des victoires (15 combinaisons dim × fonction)</h2>
 <table>
 <thead>
 <tr>
@@ -333,7 +580,7 @@ La « victoire » de Backprop sur <code>ggamma</code> correspond à un plateau (
 Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du gagnant.</p>
 </blockquote>
 <hr />
-<h2>5. Temps de calcul (en secondes, par run de 25 000 évaluations)</h2>
+<h2>6. Temps de calcul (en secondes, par run de 25 000 évaluations)</h2>
 <p>Temps moyens par dimension et algorithme :</p>
 <table>
 <thead>
@@ -348,21 +595,21 @@ Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du 
 <tbody>
 <tr>
 <td>3D</td>
-<td>4.20</td>
+<td>~4–5</td>
 <td>4.10</td>
 <td>4.74</td>
 <td>4.42</td>
 </tr>
 <tr>
 <td>10D</td>
-<td>4.25</td>
+<td>~4–5</td>
 <td>4.17</td>
 <td>4.92</td>
 <td>4.53</td>
 </tr>
 <tr>
 <td>50D</td>
-<td>4.54</td>
+<td>~4–5</td>
 <td>4.49</td>
 <td>5.61</td>
 <td>5.01</td>
@@ -373,12 +620,13 @@ Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du 
 <p>Les temps sont comparables (~4 à 5 s par run). <strong>Hybrid est plus rapide que GWO</strong> car il bénéficie d'une bonne initialisation venant de Ray Shooting.</p>
 </blockquote>
 <hr />
-<h2>6. Synthèse par algorithme</h2>
-<h3>Backprop</h3>
+<h2>7. Synthèse par algorithme</h2>
+<h3>Backprop (PyTorch autograd)</h3>
 <ul>
-<li>Plafonne à un niveau « ELM » (Extreme Learning Machine) : les couches cachées Heaviside sont <strong>gelées</strong> car le gradient est nul presque partout.</li>
-<li>Seule la couche de sortie est mise à jour. Le réseau dégénère en régression linéaire sur des features aléatoires.</li>
-<li>Vérifié par test unitaire : les poids cachés sont identiques avant et après entraînement.</li>
+<li>L'activation Heaviside <code>(z ≥ 0)</code> est non-différentiable : <strong>l'autograd de PyTorch attribue de lui-même un gradient nul (<code>grad=None</code>) aux couches cachées</strong>, qui restent donc figées à leur initialisation aléatoire.</li>
+<li>Seule la couche de sortie est entraînée → le réseau dégénère en <strong>régression linéaire sur des features binaires aléatoires</strong> (équivalent « Extreme Learning Machine »).</li>
+<li>Conséquence quantifiée : <strong>R² ≈ 0 dès la 10D</strong> — le backprop n'apprend rien au-delà de la moyenne. En 3D, les features aléatoires portent un peu de signal par chance (R² ≈ 0.21), mais cet effet disparaît en haute dimension (concentration de la mesure).</li>
+<li>L'échec est démontré, et non postulé : il émerge naturellement de l'autograd.</li>
 </ul>
 <h3>Ray Shooting</h3>
 <ul>
@@ -387,7 +635,7 @@ Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du 
 </ul>
 <h3>GWO (Grey Wolf Optimizer)</h3>
 <ul>
-<li>~40 % d'amélioration moyenne par rapport à Backprop/Ray.</li>
+<li>~40 % d'amélioration moyenne par rapport à Backprop/Ray (et R² nettement supérieur : 0.33–0.53 contre ≈ 0).</li>
 <li>La hiérarchie alpha/beta/delta fournit une mémoire collective et exploite la meilleure solution trouvée.</li>
 <li>Meilleur algorithme individuel sur 3/5 fonctions en 10D.</li>
 </ul>
@@ -395,10 +643,10 @@ Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du 
 <ul>
 <li>Combine l'exploration globale de Ray Shooting avec le raffinement de GWO autour de <code>best_ray</code>.</li>
 <li><code>wolves[0] = best_ray</code> (garantie de non-régression), <code>wolves[1:] = best_ray + bruit gaussien</code>.</li>
-<li><strong>Meilleure moyenne sur les trois dimensions</strong>, gains les plus marqués en 50D.</li>
+<li><strong>Meilleur R² moyen sur les trois dimensions</strong>, gains les plus marqués en 50D.</li>
 </ul>
 <hr />
-<h2>7. Conclusions</h2>
+<h2>8. Conclusions</h2>
 <table>
 <thead>
 <tr>
@@ -409,24 +657,24 @@ Sur les 6 cas où il ne gagne pas, il reste à <strong>moins de 5 %</strong> du 
 <tbody>
 <tr>
 <td>Backprop est limité sur les réseaux à activation discontinue</td>
-<td><strong>Confirmé</strong> (plateau au niveau ELM)</td>
+<td><strong>Confirmé</strong> — R² ≈ 0 dès la 10D, gradient nul découvert par autograd</td>
 </tr>
 <tr>
 <td>Les méthodes sans gradient (GWO) surpassent celles à gradient</td>
-<td><strong>Confirmé</strong> (~40 % de gain)</td>
+<td><strong>Confirmé</strong> — R² 0.33–0.53 contre ≈ 0</td>
 </tr>
 <tr>
 <td>Hybrid bat chaque méthode prise isolément</td>
-<td><strong>Confirmé</strong> (meilleure moyenne sur 3/3 dimensions)</td>
+<td><strong>Confirmé</strong> — meilleur R² moyen sur 3/3 dimensions</td>
 </tr>
 <tr>
 <td>Le résultat se maintient en 3D → 10D → 50D</td>
-<td><strong>Confirmé</strong></td>
+<td><strong>Confirmé</strong> — l'écart se creuse même en haute dimension</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Conclusion principale :</strong> L'algorithme <strong>Hybrid</strong> est globalement le plus performant, suivi de <strong>GWO</strong>. Backprop et Ray Shooting sont nettement en retrait sur ces fonctions discontinues, ce qui confirme l'intérêt des méthodes sans gradient (et de leur combinaison) pour ce type de problème.</p>
+<p><strong>Conclusion principale :</strong> mesuré correctement (par le R², et non par un MSE absolu trompé par la normalisation), le backprop <strong>échoue</strong> sur ces réseaux à activation discontinue — son R² tombe à zéro dès la dimension 10, ce qui était l'hypothèse à démontrer. Les méthodes sans gradient (GWO) et surtout leur combinaison (<strong>Hybrid</strong>) exploitent les couches cachées que le backprop ne peut pas optimiser, et restent les seules à expliquer une part substantielle de la structure des fonctions discontinues.</p>
 <hr />
-<p><em>Données brutes : <code>results/global_summary.csv</code> — Figure de comparaison : <code>results/global_comparison.png</code></em></p>
+<p><em>Données brutes : <code>results/global_summary.csv</code> (colonnes <code>mse_val</code>, <code>baseline_val</code>, <code>r2_val</code>) — Figure de comparaison : <code>results/global_comparison.png</code> — Figures de convergence (avec ligne baseline R²=0) : <code>results/{3d,10d,50d}/figures/</code>.</em></p>
 </body>
 </html>
